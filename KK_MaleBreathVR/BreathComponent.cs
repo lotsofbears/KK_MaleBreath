@@ -8,6 +8,7 @@ using static KK_MaleBreathVR.LoadVoice;
 using Random = UnityEngine.Random;
 using System.Collections;
 using static UnityEngine.Experimental.Director.FrameData;
+using VRGIN.Core;
 
 namespace KK_MaleBreathVR
 {
@@ -22,12 +23,28 @@ namespace KK_MaleBreathVR
         private bool _clickPending;
         private static Manager.Scene _scene;
         private bool _ownVoiceActive;
-        private bool _partnerVoiceActive;
+        private bool _partnerVoiceWasActive;
         internal static HFlag _hFlag;
         internal static List<ChaControl> _lstFemale;
+        internal static HandCtrl _handCtrl;
         private int _voiceCooldown;
         private bool[] _encroachingVoices;
         private bool _waitForTrigger;
+        private Transform GetMouth
+        {
+            get
+            {
+                if (_mouth == null)
+                {
+                    // KKS doesn't have this setting.
+                    _mouth = UnityEngine.VR.VRSettings.enabled ? VR.Camera.transform.Find("MouthGuide") : this.transform;
+                }
+                // KK_VR might not be initialized yet, we'll use backup for first breath.
+                return _mouth != null ? _mouth : this.transform;
+            }
+        }
+        private Transform _mouth;
+
         internal static bool IsIdleInside(string animName) => animName.EndsWith("InsertIdle", StringComparison.Ordinal);
         internal static bool IsInsert(string animName) => animName.EndsWith("Insert", StringComparison.Ordinal);
         internal static bool IsIdleOutside(string animName) => animName.Equals("Idle");
@@ -38,7 +55,8 @@ namespace KK_MaleBreathVR
         internal static bool IsWeakLoop(string animName) => animName.EndsWith("WLoop", StringComparison.Ordinal);
         internal static bool IsStrongLoop(string animName) => animName.EndsWith("SLoop", StringComparison.Ordinal);
         internal static bool IsOrgasmLoop(string animName) => animName.EndsWith("OLoop", StringComparison.Ordinal);
-        internal static bool IsKissAnim(string animName) => animName.StartsWith("K_", StringComparison.Ordinal);
+        // K_Touch is too early for breath to start.
+        internal static bool IsKissAnim(string animName) => animName.StartsWith("K_L", StringComparison.Ordinal);
         internal static bool IsOwnClimax(string animName) => animName.EndsWith("M_IN_Start", StringComparison.Ordinal) 
             || animName.EndsWith("M_OUT_Start", StringComparison.Ordinal);
         internal static bool IsPartnerClimax(string animName) => animName.EndsWith("WF_IN_Start", StringComparison.Ordinal) 
@@ -48,7 +66,18 @@ namespace KK_MaleBreathVR
         internal static bool IsAfterClimaxInside(string animName) => animName.EndsWith("IN_A", StringComparison.Ordinal);
         internal static bool IsAfterClimaxOutside(string animName) => animName.EndsWith("OUT_A", StringComparison.Ordinal);
         internal static bool IsAfterClimaxInMouth(string animName) => animName.StartsWith("Oral", StringComparison.Ordinal);
-        internal static bool IsFast => _hFlag.speedCalc > 0.5f;
+        internal static bool IsFast
+        {
+            get
+            {
+                // Will fail if aibuMaxSpeed is modified.
+                return _hFlag.mode switch
+                {
+                    HFlag.EMode.aibu => _hFlag.speed > 0.75f,
+                    _ => _hFlag.speedCalc > 0.5f
+                };
+            }
+        }
         internal static bool IsPartnerVoiceActive
         {
             get
@@ -83,13 +112,21 @@ namespace KK_MaleBreathVR
                     return null;
             }
         }
+
+        /// <summary>
+        /// Check if lstFemale[0] voice has more then half of the time to fire on its timer.
+        /// </summary>
         private bool IsPartnerVoiceRecent()
         {
             var timeWait = GetTimeWait();
             if (timeWait == null) return true;
             return timeWait.timeIdle - timeWait.timeIdleCalc > timeWait.timeIdle * 0.5f;
         }
+
         private bool IsOwnVoiceRecent() => _voiceCooldown > MaleBreath.AverageVoiceCooldown.Value * 0.5f;
+        /// <summary>
+        /// We increase hFlag's TimeWait if it gets too close to firing voiceProc.
+        /// </summary>
         private void PostponeVoice()
         {
             var timeWait = GetTimeWait();
@@ -100,6 +137,7 @@ namespace KK_MaleBreathVR
                 timeWait.timeIdleCalc = timeWait.timeIdle - 2f;
             }
         }
+
         private void PlayPartnerVoice()
         {
             // Immediate response feels unnatural. 
@@ -117,14 +155,18 @@ namespace KK_MaleBreathVR
         }
         private IEnumerator OncePerSecondCo()
         {
+            // Here we once a second update breathType.
+            // And count cooldown of our voice.
             while (true)
             {
                 yield return new WaitForSeconds(1f);
                 if (_scene.IsExit) continue;
                 if (!_ownVoiceActive)
                 {
-                    if (IsPartnerVoiceActive) _partnerVoiceActive = true;
-                    else if (_voiceCooldown-- < 0 && SetVoice()) continue;
+                    if (IsPartnerVoiceActive)
+                        _partnerVoiceWasActive = true;
+                    else if (_voiceCooldown-- < 0 && SetVoice()) 
+                        continue;
                     SetBreath();
                 }
                 else
@@ -136,6 +178,8 @@ namespace KK_MaleBreathVR
 
         private void Update()
         {
+            // Here we wait for special event if it's on the horizon,
+            // and immediately set voice if previous has ended.
             if (_waitForTrigger && CatchTrigger())
             {
                 DoVoice();
@@ -144,13 +188,12 @@ namespace KK_MaleBreathVR
             if (_voiceTransform == null && !_scene.IsExit)
             {
                 if (RecoverTransform()) return;
-                if (_partnerVoiceActive && !IsPartnerVoiceActive)
+                if (_partnerVoiceWasActive && !IsPartnerVoiceActive)
                 {
-                    _partnerVoiceActive = false;
-                    MaleBreath.Logger.LogDebug($"Set:OwnResponse:{IsOwnVoiceRecent()}");
+                    _partnerVoiceWasActive = false;
+                    MaleBreath.Logger.LogDebug($"Set:OwnResponse:{!IsOwnVoiceRecent()}");
                     if (!IsOwnVoiceRecent() && SetVoice()) return;
                 }
-
                 if (_inTransition)
                 {
                     _inTransition = false;
@@ -162,6 +205,7 @@ namespace KK_MaleBreathVR
                 }
             }
         }
+        
         private bool RecoverTransform()
         {
             if (_chara.asVoice != null)
@@ -205,21 +249,21 @@ namespace KK_MaleBreathVR
                     }
                 }
                 if (Random.value < 0.67f && !IsPartnerVoiceRecent()) PlayPartnerVoice();
-                MaleBreath.Logger.LogDebug($"Set:PartnerResponse:{IsPartnerVoiceRecent()}");
+                MaleBreath.Logger.LogDebug($"Set:PartnerResponse:{!IsPartnerVoiceRecent()}");
             }
         }
         private void DoBreath()
         {
             DoClick();
             _voiceTransform = _chara.objTop.activeSelf && _chara.visibleAll ? PlayBreath(_currentBreath, chara: _chara) 
-                : PlayBreath(_currentBreath, breathTransform: this.transform); // VR.Camera.transform);
+                : PlayBreath(_currentBreath, breathTransform: GetMouth);
             DeactivateVoice();
         }
         private bool DoVoice()
         {
             DoClick();
             var transform = _chara.objTop.activeSelf && _chara.visibleAll ? PlayVoice(_currentVoice, chara: _chara)
-                : PlayVoice(_currentVoice, voiceTransform: this.transform); // VR.Camera.transform);
+                : PlayVoice(_currentVoice, voiceTransform: GetMouth); // VR.Camera.transform);
             if (transform != null)
             {
                 _voiceTransform = transform;
@@ -310,10 +354,9 @@ namespace KK_MaleBreathVR
                 case HFlag.EMode.sonyu:
                 case HFlag.EMode.sonyu3P:
                 case HFlag.EMode.sonyu3PMMF:
-                    var finish = _hFlag.finish;
-                    if (finish != HFlag.FinishKind.none)
+                    if (_hFlag.finish != HFlag.FinishKind.none)
                     {
-                        switch (finish)
+                        switch (_hFlag.finish)
                         {
                             case HFlag.FinishKind.inside:
                             case HFlag.FinishKind.outside:
@@ -340,6 +383,7 @@ namespace KK_MaleBreathVR
             }
             return false;
         }
+
         private void SetBreath()
         {
             var animName = _hFlag.nowAnimStateName;
@@ -347,7 +391,15 @@ namespace KK_MaleBreathVR
             switch (_hFlag.mode)
             {
                 case HFlag.EMode.aibu:
-                    if (IsKissAnim(animName)) ManageKiss();
+                    if (IsKissAnim(animName))
+                    {
+                        breathType = _currentBreath != BreathType.KissExclamation && Random.value < 0.2f ? BreathType.KissExclamation 
+                            : IsFast ? BreathType.KissFast : BreathType.KissSlow;
+                    }
+                    else if (_handCtrl.GetUseAreaItemActive() != -1 && _handCtrl.useItems[2] != null)
+                    {
+                        breathType = IsFast ? BreathType.LickFast : BreathType.LickSlow;
+                    }
                     break;
                 case HFlag.EMode.houshi:
                 case HFlag.EMode.houshi3P:
@@ -370,37 +422,77 @@ namespace KK_MaleBreathVR
                 case HFlag.EMode.sonyu3PMMF:
                     if (IsWeakLoop(animName))
                     {
-                        // Grab SensH ceiling.
-                        if (_hFlag.gaugeMale > 70f)
+                        if (_handCtrl.IsKissAction())
                         {
-                            breathType = IsFast ? BreathType.LateLoopWeakFast : BreathType.LateLoopWeakSlow;
+                            breathType = _currentBreath != BreathType.KissExclamation && Random.value < 0.2f ? BreathType.KissExclamation 
+                                : IsFast ? BreathType.KissDuringLoopWeakFast : BreathType.KissDuringLoopWeakSlow;
+                        }
+                        else if (_handCtrl.GetUseAreaItemActive() != -1 && _handCtrl.useItems[2] != null)
+                        {
+                            breathType = IsFast ? BreathType.SuckWeakFast : BreathType.SuckWeakSlow;
                         }
                         else
                         {
-                            breathType = IsFast ? BreathType.LoopWeakFast : BreathType.LoopWeakSlow;
+                            // Grab SensH ceiling.
+                            if (_hFlag.gaugeMale > 70f)
+                            {
+                                breathType = IsFast ? BreathType.LateLoopWeakFast : BreathType.LateLoopWeakSlow;
+                            }
+                            else
+                            {
+                                breathType = IsFast ? BreathType.LoopWeakFast : BreathType.LoopWeakSlow;
+                            }
                         }
                     }
                     else if (IsStrongLoop(animName) || IsOrgasmLoop(animName))
                     {
-                        if (_hFlag.gaugeMale > 70f)
+                        if (_handCtrl.IsKissAction())
                         {
-                            breathType = IsFast ? BreathType.LateLoopStrongFast : BreathType.LateLoopStrongSlow;
+                            breathType = _currentBreath != BreathType.KissExclamation && Random.value < 0.2f ? BreathType.KissExclamation 
+                                : IsFast ? BreathType.KissDuringLoopStrongFast : BreathType.KissDuringLoopStrongSlow;
+                        }
+                        else if (_handCtrl.GetUseAreaItemActive() != -1 && _handCtrl.useItems[2] != null)
+                        {
+                            breathType = IsFast ? BreathType.SuckStrongFast : BreathType.SuckStrongSlow;
                         }
                         else
                         {
-                            breathType = IsFast ? BreathType.LoopStrongFast : BreathType.LoopStrongSlow;
+                            if (_hFlag.gaugeMale > 70f)
+                            {
+                                breathType = IsFast ? BreathType.LateLoopStrongFast : BreathType.LateLoopStrongSlow;
+                            }
+                            else
+                            {
+                                breathType = IsFast ? BreathType.LoopStrongFast : BreathType.LoopStrongSlow;
+                            }
                         }
+                        
                     }
                     else if (IsAfterClimaxInside(animName) || IsAfterClimaxOutside(animName))
                     {
                         breathType = BreathType.Strained;
+                    }
+                    else
+                    {
+                        if (_handCtrl.IsKissAction())
+                        {
+                            breathType = _currentBreath != BreathType.KissExclamation && Random.value < 0.2f ? BreathType.KissExclamation
+                                : BreathType.KissSlow;
+                        }
+                        else if (_handCtrl.GetUseAreaItemActive() != -1 && _handCtrl.useItems[2] != null)
+                        {
+                            breathType = BreathType.LickSlow;
+                        }
                     }
                     break;
             }
             if (breathType == _currentBreath) return;
             if (_inTransition)
             {
-                MaleBreath.Logger.LogDebug($"Transition:cur - {_currentBreath}:tar - {breathType}");
+                // Instead of jumping from non-normal voice back to normal, we go:
+                // non-normal -> strained -> semi-strained -> normal.
+                // The other way we go straight to non-normal.
+                MaleBreath.Logger.LogDebug($"Transition:from - {_currentBreath}:to - {breathType}");
                 if (breathType > _currentBreath)
                 {
                     MaleBreath.Logger.LogDebug($"Transition:OverrideWithHigherVoice");
@@ -436,10 +528,6 @@ namespace KK_MaleBreathVR
                 //return true;
             }
             //return false;
-        }
-        private void ManageKiss()
-        {
-
         }
     }
 }

@@ -86,20 +86,21 @@ namespace KK_MaleBreathVR
             LateLoopWeakFast,
             LateLoopStrongSlow,
             LateLoopStrongFast,
-            KissEngage,
             KissExclamation,
-            KissWeakSlow,
-            KissWeakFast,
-            KissStrongSlow,
-            KissStrongFast,
+            KissSlow,
+            KissFast,
+           // KissStrongSlow,
+            //KissStrongFast,
             KissDuringLoopWeakSlow,
             KissDuringLoopWeakFast,
             KissDuringLoopStrongSlow,
             KissDuringLoopStrongFast,
-            LickWeakSlow,
-            LickWeakFast,
-            LickStrongSlow,
-            LickStrongFast,
+            LickSlow,
+            LickFast,
+            //LickWeakSlow,
+            //LickWeakFast,
+            //LickStrongSlow,
+            //LickStrongFast,
             SuckWeakSlow,
             SuckWeakFast,
             SuckStrongSlow,
@@ -177,7 +178,7 @@ namespace KK_MaleBreathVR
                 assetBundleName = bundle,
                 assetName = asset,
                 pitch = chara == null ? 1f : chara.fileParam.voicePitch,
-                voiceTrans = chara == null ? breathTransform : chara.objHead.transform
+                voiceTrans = chara == null ? breathTransform : chara.dictRefObj[ChaReference.RefObjKey.a_n_mouth].transform,
 
             };
             //chara.ChangeMouthPtn(0, true);
@@ -276,7 +277,7 @@ namespace KK_MaleBreathVR
             var voiceTypeEnum = Enum.GetNames(typeof(VoiceType));
             var hModeEnum = Enum.GetNames(typeof(HMode));
             var files = Directory.GetFiles(System.IO.Path.GetDirectoryName(typeof(MaleBreath).Assembly.Location), "*.txt");
-            MaleBreath.Logger.LogDebug($"Files:Found:{files.Length}");
+            //MaleBreath.Logger.LogDebug($"Files:Found:{files.Length}");
             foreach (var file in files)
             {
                 ReadFile(file, voiceTypeEnum, hModeEnum);
@@ -317,6 +318,7 @@ namespace KK_MaleBreathVR
             foreach (var item in array)
             {
                 var trim = item.Replace(" ", string.Empty);
+                trim = trim.Replace("\t", string.Empty);
 
                 if (trim.StartsWith("//", StringComparison.Ordinal)) continue;
                 if (hModeEnum.Any(s => s.Equals(trim)))
@@ -331,7 +333,7 @@ namespace KK_MaleBreathVR
                 }
                 else
                 {
-                    MaleBreath.Logger.LogDebug($"Dic:Add:{(HMode)currentHMode}:{(VoiceType)currentVoiceType}");
+                    //MaleBreath.Logger.LogDebug($"Dic:Add:{(HMode)currentHMode}:{(VoiceType)currentVoiceType}");
                     if (currentHMode == -1 || currentVoiceType == -1) continue;
 
                     var split = trim.Split(',');
@@ -410,29 +412,25 @@ namespace KK_MaleBreathVR
                 BreathType.LateLoopStrongSlow => breathLateLoopStrongSlow,
                 BreathType.LateLoopStrongFast => breathLateLoopStrongFast,
 
-                BreathType.KissEngage => breathKissEngage,
                 BreathType.KissExclamation => breathKissExclamation,
-                BreathType.KissWeakSlow => breathKissWeakSlow,
-                BreathType.KissWeakFast => breathKissWeakFast,
-                BreathType.KissStrongSlow => breathKissStrongSlow,
-                BreathType.KissStrongFast => breathKissStrongFast,
+                BreathType.KissSlow => breathKissSlow,
+                BreathType.KissFast => breathKissFast,
 
                 BreathType.KissDuringLoopWeakSlow => breathKissDuringLoopWeakSlow,
                 BreathType.KissDuringLoopWeakFast => breathKissDuringLoopWeakFast,
                 BreathType.KissDuringLoopStrongSlow => breathKissDuringLoopStrongSlow,
                 BreathType.KissDuringLoopStrongFast => breathKissDuringLoopStrongFast,
 
-                BreathType.LickWeakSlow => breathLickWeakSlow,
-                BreathType.LickWeakFast => breathLickWeakFast,
-                BreathType.LickStrongSlow => breathLickStrongSlow,
-                BreathType.LickStrongFast => breathLickStrongFast,
+                BreathType.LickSlow => breathLickWeakSlow,
+                BreathType.LickFast => breathLickWeakFast,
+                //BreathType.LickStrongSlow => breathLickStrongSlow,
+                //BreathType.LickStrongFast => breathLickStrongFast,
 
                 BreathType.SuckWeakSlow => breathSuckWeakSlow,
                 BreathType.SuckWeakFast => breathSuckWeakFast,
                 BreathType.SuckStrongSlow => breathSuckStrongSlow,
                 BreathType.SuckStrongFast => breathSuckStrongFast,
-                _ => new List<string>()
-
+                _ => null
             };
         }
         /*
@@ -637,8 +635,8 @@ namespace KK_MaleBreathVR
             "h/h_ko_{0:00}_03_079",
             "h/h_ko_{0:00}_03_080",
         };
-        private static readonly List<string> breathResistStrongFast = new List<string>()
-        {
+        private static readonly List<string> breathResistStrongFast =
+        [
             "h/h_ko_{0:00}_00_081",
             "h/h_ko_{0:00}_00_082",
 
@@ -647,10 +645,10 @@ namespace KK_MaleBreathVR
 
             "h/h_ko_{0:00}_03_081",
             "h/h_ko_{0:00}_03_082",
-        };
+        ];
 
-        private static readonly List<string> breathKissEngage = new List<string>()
-        {
+        private static readonly List<string> breathKissExclamation =
+        [
             "h/h_ko_{0:00}_00_023_00",
             "h/h_ko_{0:00}_00_023_01",
             "h/h_ko_{0:00}_00_023_02",
@@ -661,31 +659,6 @@ namespace KK_MaleBreathVR
             "h/h_ko_{0:00}_00_023_07",
             "h/h_ko_{0:00}_00_023_08",
             "h/h_ko_{0:00}_00_023_09",
-
-            "h/h_ko_{0:00}_02_023_00",
-            "h/h_ko_{0:00}_02_023_01",
-            "h/h_ko_{0:00}_02_023_02",
-            "h/h_ko_{0:00}_02_023_03",
-            "h/h_ko_{0:00}_02_023_04",
-            "h/h_ko_{0:00}_02_023_05",
-            "h/h_ko_{0:00}_02_023_06",
-            "h/h_ko_{0:00}_02_023_07",
-            "h/h_ko_{0:00}_02_023_08",
-            "h/h_ko_{0:00}_02_023_09",
-
-            "h/h_ko_{0:00}_03_023_00",
-            "h/h_ko_{0:00}_03_023_01",
-            "h/h_ko_{0:00}_03_023_02",
-            "h/h_ko_{0:00}_03_023_03",
-            "h/h_ko_{0:00}_03_023_04",
-            "h/h_ko_{0:00}_03_023_05",
-            "h/h_ko_{0:00}_03_023_06",
-            "h/h_ko_{0:00}_03_023_07",
-            "h/h_ko_{0:00}_03_023_08",
-            "h/h_ko_{0:00}_03_023_09",
-        };
-        private static readonly List<string> breathKissExclamation = new List<string>()
-        {
             "h/h_ko_{0:00}_00_024_00",
             "h/h_ko_{0:00}_00_024_01",
             "h/h_ko_{0:00}_00_024_02",
@@ -697,6 +670,16 @@ namespace KK_MaleBreathVR
             "h/h_ko_{0:00}_00_024_08",
             "h/h_ko_{0:00}_00_024_09",
 
+            "h/h_ko_{0:00}_02_023_00",
+            "h/h_ko_{0:00}_02_023_01",
+            "h/h_ko_{0:00}_02_023_02",
+            "h/h_ko_{0:00}_02_023_03",
+            "h/h_ko_{0:00}_02_023_04",
+            "h/h_ko_{0:00}_02_023_05",
+            "h/h_ko_{0:00}_02_023_06",
+            "h/h_ko_{0:00}_02_023_07",
+            "h/h_ko_{0:00}_02_023_08",
+            "h/h_ko_{0:00}_02_023_09",
             "h/h_ko_{0:00}_02_024_00",
             "h/h_ko_{0:00}_02_024_01",
             "h/h_ko_{0:00}_02_024_02",
@@ -708,7 +691,16 @@ namespace KK_MaleBreathVR
             "h/h_ko_{0:00}_02_024_08",
             "h/h_ko_{0:00}_02_024_09",
 
-
+            "h/h_ko_{0:00}_03_023_00",
+            "h/h_ko_{0:00}_03_023_01",
+            "h/h_ko_{0:00}_03_023_02",
+            "h/h_ko_{0:00}_03_023_03",
+            "h/h_ko_{0:00}_03_023_04",
+            "h/h_ko_{0:00}_03_023_05",
+            "h/h_ko_{0:00}_03_023_06",
+            "h/h_ko_{0:00}_03_023_07",
+            "h/h_ko_{0:00}_03_023_08",
+            "h/h_ko_{0:00}_03_023_09",
             "h/h_ko_{0:00}_03_024_00",
             "h/h_ko_{0:00}_03_024_01",
             "h/h_ko_{0:00}_03_024_02",
@@ -719,72 +711,90 @@ namespace KK_MaleBreathVR
             "h/h_ko_{0:00}_03_024_07",
             "h/h_ko_{0:00}_03_024_08",
             "h/h_ko_{0:00}_03_024_09",
-        };
-        private static readonly List<string> breathKissWeakSlow = new List<string>()
+        ];
+        private static readonly List<string> breathKissSlow = new List<string>()
         {
             "h/h_ko_{0:00}_00_013",
-
-            "h/h_ko_{0:00}_02_013",
-
-            "h/h_ko_{0:00}_03_015",
-        };
-        private static readonly List<string> breathKissWeakFast = new List<string>()
-        {
-            "h/h_ko_{0:00}_00_014",
-
-            "h/h_ko_{0:00}_02_014",
-
-            "h/h_ko_{0:00}_03_016",
-        };
-        private static readonly List<string> breathKissStrongSlow = new List<string>()
-        {
             "h/h_ko_{0:00}_00_017",
 
+            "h/h_ko_{0:00}_02_013",
             "h/h_ko_{0:00}_02_017",
 
+            "h/h_ko_{0:00}_03_015",
             "h/h_ko_{0:00}_03_019",
-
         };
-        private static readonly List<string> breathKissStrongFast = new List<string>()
+        private static readonly List<string> breathKissFast = new List<string>()
         {
+            "h/h_ko_{0:00}_00_014",
             "h/h_ko_{0:00}_00_018",
 
+            "h/h_ko_{0:00}_02_014",
             "h/h_ko_{0:00}_02_018",
 
+            "h/h_ko_{0:00}_03_016",
             "h/h_ko_{0:00}_03_020",
         };
-        private static readonly List<string> breathLickWeakSlow = new List<string>()
-        {
+        //private static readonly List<string> breathKissStrongSlow = new List<string>()
+        //{
+        //    "h/h_ko_{0:00}_00_017",
+
+        //    "h/h_ko_{0:00}_02_017",
+
+        //    "h/h_ko_{0:00}_03_019",
+
+        //};
+        //private static readonly List<string> breathKissStrongFast = new List<string>()
+        //{
+        //    "h/h_ko_{0:00}_00_018",
+
+        //    "h/h_ko_{0:00}_02_018",
+
+        //    "h/h_ko_{0:00}_03_020",
+        //};
+        private static readonly List<string> breathLickWeakSlow =
+        [
             "h/h_ko_{0:00}_00_025",
             "h/h_ko_{0:00}_00_026",
 
-            "h/h_ko_{0:00}_03_025",
-            "h/h_ko_{0:00}_03_026",
-        };
-        private static readonly List<string> breathLickWeakFast = new List<string>()
-        {
-            "h/h_ko_{0:00}_00_027",
-            "h/h_ko_{0:00}_00_028",
-
-            "h/h_ko_{0:00}_03_027",
-            "h/h_ko_{0:00}_03_028"
-        };
-        private static readonly List<string> breathLickStrongSlow = new List<string>()
-        {
             "h/h_ko_{0:00}_00_029",
             "h/h_ko_{0:00}_00_030",
 
+            "h/h_ko_{0:00}_03_025",
+            "h/h_ko_{0:00}_03_026",
+
             "h/h_ko_{0:00}_03_029",
             "h/h_ko_{0:00}_03_030",
-        };
-        private static readonly List<string> breathLickStrongFast = new List<string>()
-        {
+        ];
+        private static readonly List<string> breathLickWeakFast =
+        [
+            "h/h_ko_{0:00}_00_027",
+            "h/h_ko_{0:00}_00_028",
+
             "h/h_ko_{0:00}_00_031",
             "h/h_ko_{0:00}_00_032",
 
+            "h/h_ko_{0:00}_03_027",
+            "h/h_ko_{0:00}_03_028",
+
             "h/h_ko_{0:00}_03_031",
             "h/h_ko_{0:00}_03_032",
-        };
+        ];
+        //private static readonly List<string> breathLickStrongSlow = new List<string>()
+        //{
+        //    "h/h_ko_{0:00}_00_029",
+        //    "h/h_ko_{0:00}_00_030",
+
+        //    "h/h_ko_{0:00}_03_029",
+        //    "h/h_ko_{0:00}_03_030",
+        //};
+        //private static readonly List<string> breathLickStrongFast = new List<string>()
+        //{
+        //    "h/h_ko_{0:00}_00_031",
+        //    "h/h_ko_{0:00}_00_032",
+
+        //    "h/h_ko_{0:00}_03_031",
+        //    "h/h_ko_{0:00}_03_032",
+        //};
         private static readonly List<string> breathSuckWeakSlow = new List<string>()
         {
             "h/h_ko_{0:00}_00_033",

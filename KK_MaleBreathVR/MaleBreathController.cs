@@ -11,7 +11,7 @@ namespace KK_MaleBreathVR
 {
     internal class MaleBreathController : GameCustomFunctionController
     {
-        private static Action<string> actionButtonDelegate;
+        private static Action<string> ClickButton;
         internal static readonly List<BreathComponent> breathComponents = new List<BreathComponent>();
         private static ClickType _queuedClick = ClickType.None;
         protected override void OnStartH(MonoBehaviour proc, HFlag hFlag, bool vr)
@@ -21,14 +21,14 @@ namespace KK_MaleBreathVR
             MaleBreath.Logger.LogDebug($"OnStartH:{male}");
             if (male == null) return;
 
-            BreathComponent._lstFemale = traverse.Field("lstFemale").GetValue<List<ChaControl>>();
             BreathComponent._hFlag = hFlag;
+            BreathComponent._lstFemale = traverse.Field("lstFemale").GetValue<List<ChaControl>>();
+            BreathComponent._handCtrl = traverse.Field("hand").GetValue<HandCtrl>();
             breathComponents.Add(male.gameObject.AddComponent<BreathComponent>());
             var type = AccessTools.TypeByName("KK_SensibleH.AutoMode.LoopController");
             if (type != null)
             {
-                var method = AccessTools.FirstMethod(type, m => m.Name.Equals("ActionButton"));
-                actionButtonDelegate = AccessTools.MethodDelegate<Action<string>>(method);
+                ClickButton = AccessTools.MethodDelegate<Action<string>>(AccessTools.FirstMethod(type, m => m.Name.Equals("ClickButton")));
             }
         }
         /// <returns>True if we want to run our side first.</returns>
@@ -65,9 +65,9 @@ namespace KK_MaleBreathVR
         public static void Click()
         {
             MaleBreath.Logger.LogDebug($"AttemptToClick:{_queuedClick}");
-            if (_queuedClick != ClickType.None && actionButtonDelegate != null)
+            if (_queuedClick != ClickType.None && ClickButton != null)
             {
-                actionButtonDelegate(_queuedClick.ToString());
+                ClickButton(_queuedClick.ToString());
             }
         }
         enum ClickType
