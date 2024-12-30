@@ -1,14 +1,16 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using HarmonyLib;
 using KKAPI;
 using KKAPI.MainGame;
+using KKAPI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace KK_MaleBreathVR
+namespace KK_MaleBreath
 {
     [BepInPlugin(GUID, "KK_MaleBreath", Version)]
     [BepInProcess(KoikatuAPI.GameProcessName)]
@@ -21,7 +23,7 @@ namespace KK_MaleBreathVR
         public static ConfigEntry<Personality> PlayerPersonality;
         public static ConfigEntry<HExp> PreferredVoiceExperience;
         public static ConfigEntry<HExp> PreferredBreathExperience;
-        public static ConfigEntry<float> VoiceVolume;
+        public static ConfigEntry<float> Volume;
         public static ConfigEntry<int> AverageVoiceCooldown;
         internal new static ManualLogSource Logger;
         public static int GetPlayerPersonality() => (int)PlayerPersonality.Value;
@@ -36,38 +38,42 @@ namespace KK_MaleBreathVR
                 );
             PlayerPersonality = Config.Bind(
                 section: "",
-                key: "PlayerPersonality",
-                defaultValue: Personality.Tomboy,
+                key: "Personality",
+                defaultValue: Personality.Stubborn,
                 ""
                 );
             PreferredVoiceExperience = Config.Bind(
                 section: "",
-                key: "PreferredVoiceExperience",
+                key: "VoiceExperience",
                 defaultValue: HExp.淫乱,
                 ""
                 );
             PreferredBreathExperience = Config.Bind(
                 section: "",
-                key: "PreferredBreathExperience",
+                key: "BreathExperience",
                 defaultValue: HExp.淫乱,
                 ""
                 );
-            VoiceVolume = Config.Bind(
+            Volume = Config.Bind(
                 section: "",
                 key: "Volume",
                 defaultValue: 0.5f,
                 new ConfigDescription("",
-                new AcceptableValueRange<float>(0f, 1f))
+                new AcceptableValueRange<float>(0f, 1f),
+                new ConfigurationManagerAttributes { ShowRangeAsPercent = false })
                 );
             AverageVoiceCooldown = Config.Bind(
                 section: "",
-                key: "AverageVoiceCooldown",
+                key: "VoiceCooldown",
                 defaultValue: 25,
                 new ConfigDescription("",
                 new AcceptableValueRange<int>(0, 60))
                 );
             LoadVoice.Initialize();
             GameAPI.RegisterExtraBehaviour<MaleBreathController>(GUID);
+#if KKS
+            Harmony.CreateAndPatchAll(typeof(Patches));
+#endif
         }
         public enum HExp
         {

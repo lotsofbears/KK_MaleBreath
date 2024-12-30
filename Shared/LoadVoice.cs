@@ -15,27 +15,27 @@ using System.Xml;
 using UniRx;
 using UnityEngine;
 using static Illusion.Utils;
-using static KK_MaleBreathVR.MaleBreath;
-using static SaveData;
+using static KK_MaleBreath.MaleBreath;
 
-namespace KK_MaleBreathVR
+namespace KK_MaleBreath
 {
     internal static class LoadVoice
     {
         internal static string lastLoadedAsset;
         private static string _path = "sound/data/pcm/c{0:00}/";
-        private static readonly Dictionary<int, string> extraPersonalities = new Dictionary<int, string>()
-        {
-            { 30, "14" },
-            { 31, "15" },
-            { 32, "16" },
-            { 33, "17" },
-            { 34, "20" },
-            { 35, "20" },
-            { 36, "20" },
-            { 37, "20" },
-            { 38, "50" }
-        };
+        //private static readonly Dictionary<int, string> extraPersonalities = new Dictionary<int, string>()
+        //{
+        //    { 30, "14" },
+        //    { 31, "15" },
+        //    { 32, "16" },
+        //    { 33, "17" },
+        //    { 34, "20" },
+        //    { 35, "20" },
+        //    { 36, "20" },
+        //    { 37, "20" },
+        //    { 38, "50" }
+        //};
+
 
         public enum HMode
         {
@@ -115,19 +115,35 @@ namespace KK_MaleBreathVR
             internal string asset;
             internal int hExp;
         }
+        private static string GetBundleName(int id, bool h)
+        {
+#if KK
+            return id switch
+            {
+                30 => "14",
+                31 => "15",
+                32 => "16",
+                33 => "17",
+                34 or 35 or 36 or 37 => "20",
+                38 => "50",
+                _ => "00"
+            };
+#else
+            return id switch
+            {
+                40 or 41 or 42 or 43 => h ? "71" : "70",
+                _ => h ? "01" : "00"
+            };
+#endif
+        }
         private static string GetBundle(int id, bool hVoice)
         {
-            var bundle = "00";
-            if (extraPersonalities.ContainsKey(id))
-            {
-                bundle = extraPersonalities[id];
-            }
-            if (hVoice)
-            {
-                return bundle + "_00.unity3d";
-            }
-            else
-                return bundle + ".unity3d";
+            return GetBundleName(id, hVoice) +
+#if KK
+                (hVoice ? "_00.unity3d" : ".unity3d");
+#else
+                ".unity3d";
+#endif
         }
         public static Transform PlayBreath(BreathType breathType, ChaControl chara = null, Transform breathTransform = null)//, bool setCooldown)
         {
@@ -158,9 +174,6 @@ namespace KK_MaleBreathVR
             // Replace personality id.
             bundle = string.Format(bundle, personalityId);
 
-            // Replace hExp if there is any.
-            //bundle = bundle.Replace("^", ((int)hExp).ToString());
-
             var index = bundle.LastIndexOf('/');
 
             // Extract Asset from the string at the end.
@@ -170,8 +183,9 @@ namespace KK_MaleBreathVR
             bundle = bundle.Remove(index + 1);
 
             var h = bundle.EndsWith("h/", StringComparison.OrdinalIgnoreCase);
-            bundle = bundle + GetBundle(personalityId, hVoice: h);
+            bundle += GetBundle(personalityId, hVoice: h);
             MaleBreath.Logger.LogDebug($"LoadBreath:{bundle}:{asset}");
+
             var setting = new Illusion.Game.Utils.Voice.Setting
             {
                 no = personalityId,
@@ -181,13 +195,32 @@ namespace KK_MaleBreathVR
                 voiceTrans = chara == null ? breathTransform : chara.dictRefObj[ChaReference.RefObjKey.a_n_mouth].transform,
 
             };
+
             //chara.ChangeMouthPtn(0, true);
+#if KK
+
             breathTransform = Illusion.Game.Utils.Voice.OnecePlayChara(setting);
-            breathTransform.gameObject.GetComponent<AudioSource>().minDistance = MaleBreath.VoiceVolume.Value;
+            breathTransform.gameObject.GetComponent<AudioSource>().minDistance = MaleBreath.Volume.Value;
             if (chara != null)
             {
                 chara.SetVoiceTransform(breathTransform);
             }
+#else
+            var audioSource = Illusion.Game.Utils.Voice.OncePlayChara(setting);
+            if (audioSource == null)
+            {
+                MaleBreath.Logger.LogWarning($"Couldn't find specified voice:{bundle}:{asset}");
+            }
+            else
+            {
+                audioSource.volume = MaleBreath.Volume.Value;
+                breathTransform = audioSource.transform;
+                if (chara != null)
+                {
+                    chara.SetLipSync(audioSource);
+                }
+            }
+#endif
             return breathTransform;
         }
         public static Transform PlayVoice(VoiceType voiceType, ChaControl chara = null, Transform voiceTransform = null)
@@ -206,7 +239,7 @@ namespace KK_MaleBreathVR
                 var sortedList = FindExperience(voiceEntryList, hExp);
                 while (hExp > 0)
                 {
-                    if (sortedList.Count == 0 || (sortedList.Count == 1 && sortedList[0].asset.Equals(MaleBreathController.breathComponents[0]._lastVoiceName)))
+                    if (sortedList.Count == 0 || (sortedList.Count == 1 && sortedList[0].asset.Equals(BreathComponent.instances[0].lastVoiceName)))
                     {
                         --hExp;
                         sortedList = FindExperience(voiceEntryList, hExp);
@@ -219,7 +252,7 @@ namespace KK_MaleBreathVR
             if (voiceEntryList.Count > 1)
             {
                 voiceEntryList = voiceEntryList
-                    .Where(e => !e.asset.Equals(MaleBreathController.breathComponents[0]._lastVoiceName))
+                    .Where(e => !e.asset.Equals(BreathComponent.instances[0].lastVoiceName))
                     .ToList();
             }
             var voiceEntry = voiceEntryList[UnityEngine.Random.Range(0, voiceEntryList.Count)];
@@ -234,12 +267,29 @@ namespace KK_MaleBreathVR
                 pitch = chara == null ? 1f : chara.fileParam.voicePitch,
                 voiceTrans = chara == null ? voiceTransform : chara.objHead.transform
             };
+#if KK
             voiceTransform = Illusion.Game.Utils.Voice.OnecePlayChara(setting);
-            voiceTransform.gameObject.GetComponent<AudioSource>().minDistance = MaleBreath.VoiceVolume.Value;
+            voiceTransform.gameObject.GetComponent<AudioSource>().minDistance = MaleBreath.Volume.Value;
             if (chara != null)
             {
                 chara.SetVoiceTransform(voiceTransform);
             }
+#else
+            var audioSource = Illusion.Game.Utils.Voice.OncePlayChara(setting);
+            if (audioSource == null)
+            {
+                MaleBreath.Logger.LogWarning($"Couldn't find specified voice:{bundle}:{lastLoadedAsset}");
+            }
+            else
+            {
+                audioSource.volume = MaleBreath.Volume.Value;
+                voiceTransform = audioSource.transform;
+                if (chara != null)
+                {
+                    chara.SetLipSync(audioSource);
+                }
+            }
+#endif
             return voiceTransform;
         }
         private static List<VoiceEntry> FindExperience(List<VoiceEntry> voiceEntryList, int hExp)
@@ -253,7 +303,7 @@ namespace KK_MaleBreathVR
         }
         private static HMode GetHMode()
         {
-            switch (BreathComponent._hFlag.mode)
+            switch (BreathComponent.hFlag.mode)
             {
                 case HFlag.EMode.aibu:
                     return HMode.Aibu;
@@ -270,7 +320,7 @@ namespace KK_MaleBreathVR
             }
         }
         // Structure <PersonalityId, HModes<VoiceTypes<BundleAssets as string separated by ','>>>
-        private static Dictionary<int, List<List<List<VoiceEntry>>>> voiceDic = new Dictionary<int, List<List<List<VoiceEntry>>>>();
+        private static Dictionary<int, List<List<List<VoiceEntry>>>> voiceDic = [];
 
         public static void Initialize()
         {

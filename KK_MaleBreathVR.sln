@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KK_MaleBreathVR", "KK_MaleBreathVR\KK_MaleBreathVR.csproj", "{57371E5A-318F-454A-AB61-B7DC9ABFAE09}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KK_MaleBreath", "KK_MaleBreathVR\KK_MaleBreath.csproj", "{57371E5A-318F-454A-AB61-B7DC9ABFAE09}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared", "Shared\Shared.shproj", "{F3B5543C-30C3-4197-AFC1-C82D41C5A532}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKS_MaleBreath", "KKS_MaleBreath\KKS_MaleBreath.csproj", "{796404C0-8425-4B03-8369-2B00322AFFEF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,11 +19,20 @@ Global
 		{57371E5A-318F-454A-AB61-B7DC9ABFAE09}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{57371E5A-318F-454A-AB61-B7DC9ABFAE09}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{57371E5A-318F-454A-AB61-B7DC9ABFAE09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{796404C0-8425-4B03-8369-2B00322AFFEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{796404C0-8425-4B03-8369-2B00322AFFEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{796404C0-8425-4B03-8369-2B00322AFFEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{796404C0-8425-4B03-8369-2B00322AFFEF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7DE641B0-0252-4219-B672-636A72654751}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Shared\Shared.projitems*{57371e5a-318f-454a-ab61-b7dc9abfae09}*SharedItemsImports = 4
+		Shared\Shared.projitems*{796404c0-8425-4b03-8369-2b00322affef}*SharedItemsImports = 4
+		Shared\Shared.projitems*{f3b5543c-30c3-4197-afc1-c82d41c5a532}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

@@ -6,14 +6,25 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using VRGIN.Core;
+using VRGIN.Helpers;
 
-namespace KK_MaleBreathVR
+namespace KK_MaleBreath
 {
     internal class MaleBreathController : GameCustomFunctionController
     {
         private static Action<string> ClickButton;
-        internal static readonly List<BreathComponent> breathComponents = new List<BreathComponent>();
+        internal static bool IsVR => _vr;
+        private static bool _vr;
         private static ClickType _queuedClick = ClickType.None;
+        private void Start()
+        {
+            var type = AccessTools.TypeByName("KK_SensibleH.AutoMode.LoopController");
+            if (type != null)
+            {
+                ClickButton = AccessTools.MethodDelegate<Action<string>>(AccessTools.FirstMethod(type, m => m.Name.Equals("ClickButton")));
+            }
+            _vr = SteamVRDetector.IsRunning;
+        }
         protected override void OnStartH(MonoBehaviour proc, HFlag hFlag, bool vr)
         {
             var traverse = Traverse.Create(proc);
@@ -21,31 +32,32 @@ namespace KK_MaleBreathVR
             MaleBreath.Logger.LogDebug($"OnStartH:{male}");
             if (male == null) return;
 
-            BreathComponent._hFlag = hFlag;
-            BreathComponent._lstFemale = traverse.Field("lstFemale").GetValue<List<ChaControl>>();
-            BreathComponent._handCtrl = traverse.Field("hand").GetValue<HandCtrl>();
-            breathComponents.Add(male.gameObject.AddComponent<BreathComponent>());
-            var type = AccessTools.TypeByName("KK_SensibleH.AutoMode.LoopController");
-            if (type != null)
+            BreathComponent.hFlag = hFlag;
+            BreathComponent.lstFemale = traverse.Field("lstFemale").GetValue<List<ChaControl>>();
+            BreathComponent.handCtrl = traverse.Field("hand").GetValue<HandCtrl>();
+            if (male.GetComponent<BreathComponent>() == null)
             {
-                ClickButton = AccessTools.MethodDelegate<Action<string>>(AccessTools.FirstMethod(type, m => m.Name.Equals("ClickButton")));
+                male.gameObject.AddComponent<BreathComponent>();
             }
         }
         /// <returns>True if we want to run our side first.</returns>
         public static bool ButtonClick(int button)
         {
-            MaleBreath.Logger.LogDebug($"ButtonClick:{button}:{_queuedClick}");
-            if (_queuedClick != ClickType.None)
+            if (MaleBreath.Enable.Value && BreathComponent.instances.Count > 0)
             {
-                _queuedClick = ClickType.None;
-            }
-            else
-            {
-                var click = (ClickType)button;
-                if (!click.ToString().Contains("_novoice") && breathComponents[0].SetTriggerVoice(GetVoiceType(click)))
+                MaleBreath.Logger.LogDebug($"ButtonClick:{button}:{_queuedClick}");
+                if (_queuedClick != ClickType.None)
                 {
-                    _queuedClick = click;
-                    return true;
+                    _queuedClick = ClickType.None;
+                }
+                else
+                {
+                    var click = (ClickType)button;
+                    if (!click.ToString().Contains("_novoice") && BreathComponent.instances[0].SetTriggerVoice(GetVoiceType(click)))
+                    {
+                        _queuedClick = click;
+                        return true;
+                    }
                 }
             }
             return false;
