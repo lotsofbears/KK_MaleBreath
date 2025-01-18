@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
-using static KK_MaleBreath.LoadVoice;
+using static KK_MaleBreath.LoadGameVoice;
 using Random = UnityEngine.Random;
 using System.Collections;
 using VRGIN.Core;
 using VRGIN.Helpers;
 using Manager;
+using ADV.Commands.Game;
 
 namespace KK_MaleBreath
 {
@@ -23,31 +24,54 @@ namespace KK_MaleBreath
         internal string lastVoiceName;
         private bool _inTransition;
         private bool _clickPending;
-        private static Manager.Scene _scene;
         private bool _ownVoiceActive;
         private bool _partnerVoiceWasActive;
+        private Transform _mouth;
+
         internal static HFlag hFlag;
         internal static List<ChaControl> lstFemale;
+        internal static ChaControl male;
         internal static HandCtrl handCtrl;
+
+        private bool _charaActive;
+
         private int _voiceCooldown;
         private bool[] _encroachingVoices;
         private bool _waitForTrigger;
-        private static WaitForSeconds _waitForSecond = new(1f);
+        private static readonly WaitForSeconds _waitForSecond = new(1f);
         private Transform GetMouth
         {
             get
             {
                 if (_mouth == null)
                 {
-                    // KKS doesn't have this setting.
-                    _mouth = MaleBreathController.IsVR ? VR.Camera.transform.Find("MouthGuide") : this.transform;
+                    UpdateMouthTransform();
+                    // KK(S)_VR might have late init, substitute meanwhile.
+                    if (_mouth == null) return this.transform;
                 }
-                // KK_VR might not be initialized yet, we'll use backup for first breath.
-                return _mouth != null ? _mouth : this.transform;
+                return _mouth;
             }
         }
-        private Transform _mouth;
-
+        internal void UpdateMouthTransform()
+        {
+            _charaActive = _chara.objTop != null && _chara.objTop.activeSelf && _chara.visibleAll;
+            if (MaleBreathController.IsVR)
+            {
+                if (_charaActive && (!MaleBreathController.IsPov || MaleBreathController.GetPovChara != _chara))
+                {
+                    _mouth = _chara.dictRefObj[ChaReference.RefObjKey.a_n_mouth].transform;
+                }
+                else
+                {
+                    _mouth = VR.Camera.transform.Find("MouthGuide");
+                }
+            }
+            else
+            {
+                _mouth = _charaActive ? _chara.dictRefObj[ChaReference.RefObjKey.a_n_mouth].transform : hFlag.ctrlCamera.transform;
+            }
+        }
+        internal bool IsChara(ChaControl chara) => chara == _chara;
         internal static bool IsIdleInside(string animName) => animName.EndsWith("InsertIdle", StringComparison.Ordinal);
         internal static bool IsInsert(string animName) => animName.EndsWith("Insert", StringComparison.Ordinal);
         internal static bool IsIdleOutside(string animName) => animName.Equals("Idle");
@@ -98,11 +122,23 @@ namespace KK_MaleBreath
         private void Awake()
         {
             instances.Add(this);
+
+            _chara = GetComponent<ChaControl>();
+            UpdateMouthTransform();
+
+            _encroachingVoices = new bool[lstFemale.Count];
+
+            StartCoroutine(OncePerSecondCo());
         }
         private void OnDestroy()
         {
             instances.Remove(this);
+            if (_voiceTransform != null)
+            {
+                Destroy(_voiceTransform.gameObject);
+            }
         }
+
 
         private HFlag.TimeWait GetTimeWait()
         {
@@ -156,12 +192,6 @@ namespace KK_MaleBreath
         {
             return KKAPI.SceneApi.GetIsOverlap();
         }
-        private void Start()
-        {
-            _chara = GetComponent<ChaControl>();
-            _encroachingVoices = new bool[lstFemale.Count];
-            StartCoroutine(OncePerSecondCo());
-        }
         private IEnumerator OncePerSecondCo()
         {
             // Here we once a second update breathType.
@@ -193,36 +223,32 @@ namespace KK_MaleBreath
         {
             // Here we wait for special event if it's on the horizon,
             // and immediately set voice if previous has ended.
-            if (MaleBreath.Enable.Value)
+            if (_waitForTrigger && CatchTrigger())
             {
-                if (_waitForTrigger && CatchTrigger())
+                DoVoice();
+                _waitForTrigger = false;
+            }
+            if (_voiceTransform == null && !IsOverlap())
+            {
+                if (RecoverTransform()) return;
+                if (_partnerVoiceWasActive && !IsPartnerVoiceActive)
                 {
-                    DoVoice();
-                    _waitForTrigger = false;
+                    _partnerVoiceWasActive = false;
+                    MaleBreath.Logger.LogDebug($"Set:OwnResponse:{!IsOwnVoiceRecent()}");
+                    if (!IsOwnVoiceRecent() && SetVoice()) return;
                 }
-                if (_voiceTransform == null && ! IsOverlap())
+                if (_inTransition)
                 {
-                    if (RecoverTransform()) return;
-                    if (_partnerVoiceWasActive && !IsPartnerVoiceActive)
-                    {
-                        _partnerVoiceWasActive = false;
-                        MaleBreath.Logger.LogDebug($"Set:OwnResponse:{!IsOwnVoiceRecent()}");
-                        if (!IsOwnVoiceRecent() && SetVoice()) return;
-                    }
-                    if (_inTransition)
-                    {
-                        _inTransition = false;
-                        SetBreath();
-                    }
-                    else
-                    {
-                        DoBreath();
-                    }
+                    _inTransition = false;
+                    SetBreath();
+                }
+                else
+                {
+                    DoBreath();
                 }
             }
-            
         }
-        
+
         private bool RecoverTransform()
         {
             if (_chara.asVoice != null)

@@ -11,7 +11,7 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)AssemblyInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)BreathComponent.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)LoadVoice.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)LoadGameVoice.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MaleBreath.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MaleBreathController.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Patches.cs" />

@@ -12,71 +12,122 @@ using System.Text;
 
 namespace KK_MaleBreath
 {
-    [BepInPlugin(GUID, "KK_MaleBreath", Version)]
+    [BepInPlugin(GUID, Name, Version)]
     [BepInProcess(KoikatuAPI.GameProcessName)]
+
+#if KK
+    [BepInProcess(KoikatuAPI.GameProcessNameSteam)]
+#endif
+
+
     public class MaleBreath : BaseUnityPlugin
     {
         public const string GUID = "kk.malebreath";
+        public const string Name = "KK_MaleBreath";
+
         // There is a rare nullref "crash", preventing this to be 1.0
         // Haven't seen it in a while though, no clue how to catch it.
         public const string Version = "0.9.0";
-        public new static PluginInfo Info;
-        public static ConfigEntry<bool> Enable;
+        // public new static PluginInfo Info;
+        public static ConfigEntry<EnableState> Enable;
         public static ConfigEntry<Personality> PlayerPersonality;
         public static ConfigEntry<HExp> PreferredVoiceExperience;
         public static ConfigEntry<HExp> PreferredBreathExperience;
         public static ConfigEntry<float> Volume;
         public static ConfigEntry<int> AverageVoiceCooldown;
+        public static ConfigEntry<bool> RunInAibu;
         internal new static ManualLogSource Logger;
+
+        // Hook for KK(S)_VR to get desirable personality (It can play male voices on controller touch). 
         public static int GetPlayerPersonality() => (int)PlayerPersonality.Value;
+        // Hook for KK(S)_VR's PoV.
+        public static void OnPov(bool active, ChaControl chara)
+        {
+            MaleBreathController.OnPov(active, chara);
+        }
         private void Awake()    
         {
             Logger = base.Logger;
             Enable = Config.Bind(
                 section: "",
                 key: "Enable",
-                defaultValue: true,
-                ""
+                defaultValue: EnableState.OnlyInVr,
+                new ConfigDescription("",
+                null,
+                new ConfigurationManagerAttributes { Order = 20 })
                 );
+
+
+            RunInAibu = Config.Bind(
+                section: "",
+                key: "Run in caress",
+                defaultValue: true,
+                new ConfigDescription("",
+                null,
+                new ConfigurationManagerAttributes { Order = 19 })
+                );
+
+
             PlayerPersonality = Config.Bind(
                 section: "",
                 key: "Personality",
                 defaultValue: Personality.Stubborn,
-                ""
+                new ConfigDescription("",
+                null,
+                new ConfigurationManagerAttributes { Order = 15 })
                 );
-            PreferredVoiceExperience = Config.Bind(
-                section: "",
-                key: "VoiceExperience",
-                defaultValue: HExp.淫乱,
-                ""
-                );
+
+
             PreferredBreathExperience = Config.Bind(
                 section: "",
                 key: "BreathExperience",
                 defaultValue: HExp.淫乱,
-                ""
+                new ConfigDescription("",
+                null,
+                new ConfigurationManagerAttributes { Order = 14 })
                 );
+
+
+            PreferredVoiceExperience = Config.Bind(
+                section: "",
+                key: "VoiceExperience",
+                defaultValue: HExp.淫乱,
+                new ConfigDescription("",
+                null,
+                new ConfigurationManagerAttributes { Order = 13 })
+                );
+
+
             Volume = Config.Bind(
                 section: "",
                 key: "Volume",
-                defaultValue: 0.5f,
+                defaultValue: 0.2f,
                 new ConfigDescription("",
                 new AcceptableValueRange<float>(0f, 1f),
-                new ConfigurationManagerAttributes { ShowRangeAsPercent = false })
+                new ConfigurationManagerAttributes { Order = 10, ShowRangeAsPercent = false })
                 );
+
+
             AverageVoiceCooldown = Config.Bind(
                 section: "",
                 key: "VoiceCooldown",
                 defaultValue: 25,
                 new ConfigDescription("",
-                new AcceptableValueRange<int>(0, 60))
+                new AcceptableValueRange<int>(0, 60),
+                new ConfigurationManagerAttributes { Order = 9 })
                 );
-            LoadVoice.Initialize();
+
+
+            LoadGameVoice.Initialize();
             GameAPI.RegisterExtraBehaviour<MaleBreathController>(GUID);
-#if KKS
-            Harmony.CreateAndPatchAll(typeof(Patches));
-#endif
         }
+        public enum EnableState
+        {
+            Disabled,
+            OnlyInVr,
+            Always,
+        }
+
         public enum HExp
         {
             Any = -1,
@@ -85,6 +136,7 @@ namespace KK_MaleBreath
             慣れ,
             淫乱
         }
+        // Is there an in-game enum for personalities ?
         public enum Personality
         {
             Sexy,
