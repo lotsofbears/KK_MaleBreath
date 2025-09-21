@@ -14,6 +14,7 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using UniRx;
 using UnityEngine;
+using static Illusion.Component.UI.MouseButtonCheck;
 using static Illusion.Utils;
 using static KK_MaleBreath.MaleBreath;
 
@@ -21,7 +22,7 @@ namespace KK_MaleBreath
 {
     internal static class LoadGameVoice
     {
-        private readonly struct VoiceEntry
+        private class VoiceEntry
         {
             internal VoiceEntry(string _bundle, string _asset, int _hExp)
             {
@@ -35,39 +36,50 @@ namespace KK_MaleBreath
         }
 
         private const string _path = "sound/data/pcm/c{0:00}/";
-        internal static string lastLoadedAsset;
+        private static readonly Dictionary<ChaControl, string> _lastVoice = [];
 
         public enum HMode
         {
             None = -1,
-            Aibu,
-            Houshi,
-            Sonyu
+            Caress,
+            Service,
+            Intercourse
         }
         public enum VoiceType
         {
             Idle,
+
             Insert,
             InsertAnal,
+
             InsertIdle,
             InsertIdleAnal,
+
             ClimaxSelf,
+            ClimaxPartner,
             ClimaxBoth,
+
             BeforeClimaxSelf,
+            BeforeClimaxPartner,
             BeforeClimaxBoth,
-            AfterClimaxSelf,
+
+            AfterClimaxSelf, 
+            AfterClimaxPartner,
             AfterClimaxBoth,
+
             LoopSlow,
             LoopFast,
+
             LateLoopPartnerSlow,
             LateLoopPartnerFast,
             LateLoopSelfSlow,
             LateLoopSelfFast,
             LateLoopBothSlow,
             LateLoopBothFast,
-            KissDuringLoopSlow,
-            KissDuringLoopFast,
+            KissLoopSlow,
+            KissLoopFast,
             Exclamation,
+            Pull
         }
         public enum BreathType
         {
@@ -91,10 +103,10 @@ namespace KK_MaleBreath
             KissFast,
            // KissStrongSlow,
             //KissStrongFast,
-            KissDuringLoopWeakSlow,
-            KissDuringLoopWeakFast,
-            KissDuringLoopStrongSlow,
-            KissDuringLoopStrongFast,
+            KissLoopWeakSlow,
+            KissLoopWeakFast,
+            KissLoopStrongSlow,
+            KissLoopStrongFast,
             LickSlow,
             LickFast,
             //LickWeakSlow,
@@ -199,7 +211,7 @@ namespace KK_MaleBreath
             }
 
             // KK has coroutine in place there, making it awkward. 
-            UpdateVolume(breathTransform.gameObject);
+            UpdateVolume(breathTransform.gameObject, false);
 #else
             var audioSource = Illusion.Game.Utils.Voice.OncePlayChara(setting);
             if (audioSource == null)
@@ -208,7 +220,7 @@ namespace KK_MaleBreath
             }
             else
             {
-                audioSource.volume = MaleBreath.Volume.Value;
+                audioSource.volume = MaleBreath.VolumeBreath.Value;
                 breathTransform = audioSource.transform;
                 if (chara != null)
                 {
@@ -218,31 +230,61 @@ namespace KK_MaleBreath
 #endif
             return breathTransform;
         }
-        private static List<GameObject> _voiceGameObj = [];
+#if KK
+        private static readonly List<VoiceChecker> _voiceList = [];
+        private class VoiceChecker
+        {
+            internal VoiceChecker(GameObject _gameObject, bool _isVoice)
+            {
+                gameObject = _gameObject;
+                isVoice = _isVoice;
+            }
+            internal GameObject gameObject;
+            internal bool isVoice;
+        }
         public static void UpdateVolume()
         {
-            foreach (var gameObject in _voiceGameObj)
+            foreach (var value in _voiceList)
             {
-                if (gameObject == null) continue;
-                var source = gameObject.GetComponent<AudioSource>();
-                if (source != null)
+                if (value.gameObject == null) continue;
+                var aSource = value.gameObject.GetComponent<AudioSource>();
+                if (aSource != null)
                 {
-                    source.volume = MaleBreath.Volume.Value;
+                    aSource.volume = value.isVoice ? MaleBreath.VolumeVoice.Value : MaleBreath.VolumeBreath.Value;
                 }
             }
-            _voiceGameObj.RemoveAll(obj => obj == null);
+            _voiceList.RemoveAll(obj => obj.gameObject == null);
         }
-        private static void UpdateVolume(GameObject gameObject)
+        private static void UpdateVolume(GameObject gameObject, bool isVoice)
         {
-            if (!_voiceGameObj.Contains(gameObject))
-            {
-                _voiceGameObj.Add(gameObject);
-            }
+            _voiceList.Add(new (gameObject, isVoice));
             UpdateVolume();
         }
-        public static Transform PlayVoice(VoiceType voiceType, ChaControl chara = null, Transform voiceTransform = null)
+#endif
+        private static readonly List<string> _kissBreaths =
+            [
+            "013",
+            "014",
+            "015",
+            "016",
+            "017",
+            "018",
+            "019",
+            "020"
+            ];
+        private static bool IsVoiceActive(ChaControl chara)
+        {
+            return chara.asVoice != null
+                && !(chara.asVoice.name.StartsWith("h_ko", StringComparison.Ordinal)
+                // Match "0**_0*" at the end for 'Short'. e.g. in "h_ko_27_00_006_04" - [006_04] = Match!
+                || (Regex.IsMatch(chara.asVoice.name, @"0..\S0.$", RegexOptions.CultureInvariant)
+                && _kissBreaths.Any(s => chara.asVoice.name.EndsWith(s, StringComparison.Ordinal))));
+        }
+        public static Transform PlayVoice(VoiceType voiceType, ChaControl chara = null, Transform voiceTransform = null, bool voiceWait = true)
         {
             if (chara == null && voiceTransform == null) return null;
+            if (voiceWait && chara != null && IsVoiceActive(chara)) return null;
+
             var hMode = GetHMode();
             if (hMode == HMode.None) return null;
             var personalityId = GetPlayerPersonality();
@@ -251,12 +293,16 @@ namespace KK_MaleBreath
             if (voiceEntryList.Count == 0) return null;
 
             var hExp = (int)MaleBreath.PreferredVoiceExperience.Value;
+
+
+            var prevPlayed = _lastVoice.ContainsKey(chara);
+
             if (hExp != -1)
             {
                 var sortedList = FindExperience(voiceEntryList, hExp);
                 while (hExp > 0)
                 {
-                    if (sortedList.Count == 0 || (sortedList.Count == 1 && sortedList[0].asset.Equals(BreathComponent.instances[0].lastVoiceName)))
+                    if (sortedList.Count == 0 || (sortedList.Count == 1 && prevPlayed && _lastVoice[chara].Equals(sortedList[0].asset)))
                     {
                         --hExp;
                         sortedList = FindExperience(voiceEntryList, hExp);
@@ -266,21 +312,31 @@ namespace KK_MaleBreath
                     break;
                 }
             }
-            if (voiceEntryList.Count > 1)
+            if (voiceEntryList.Count > 1 && prevPlayed)
             {
                 voiceEntryList = voiceEntryList
-                    .Where(e => !e.asset.Equals(BreathComponent.instances[0].lastVoiceName))
+                    .Where(e => !e.asset.Equals(_lastVoice[chara]))
                     .ToList();
             }
             var voiceEntry = voiceEntryList[UnityEngine.Random.Range(0, voiceEntryList.Count)];
-            var bundle = voiceEntry.bundle;
-            lastLoadedAsset = voiceEntry.asset;
-            MaleBreath.Logger.LogDebug($"LoadVoice:{bundle}:{lastLoadedAsset}");
+
+            if (!prevPlayed)
+            {
+                _lastVoice.Add(chara, voiceEntry.asset);
+            }
+            else
+            {
+                _lastVoice[chara] = voiceEntry.asset;
+            }
+
+#if DEBUG
+            MaleBreath.Logger.LogDebug($"LoadVoice:{voiceEntry.bundle}:{voiceEntry.asset}");
+#endif
             var setting = new Illusion.Game.Utils.Voice.Setting
             {
                 no = personalityId,
-                assetBundleName = bundle,
-                assetName = lastLoadedAsset,
+                assetBundleName = voiceEntry.bundle,
+                assetName = voiceEntry.asset,
                 pitch = chara == null ? 1f : chara.fileParam.voicePitch,
                 voiceTrans = chara == null ? voiceTransform : chara.objHead.transform
             };
@@ -290,16 +346,16 @@ namespace KK_MaleBreath
             {
                 chara.SetVoiceTransform(voiceTransform);
             }
-            UpdateVolume(voiceTransform.gameObject);
+            UpdateVolume(voiceTransform.gameObject, true);
 #else
             var audioSource = Illusion.Game.Utils.Voice.OncePlayChara(setting);
             if (audioSource == null)
             {
-                MaleBreath.Logger.LogWarning($"Couldn't find specified voice:{bundle}:{lastLoadedAsset}");
+                MaleBreath.Logger.LogWarning($"Couldn't find specified voice:{voiceEntry.bundle}:{voiceEntry.asset}");
             }
             else
             {
-                audioSource.volume = MaleBreath.Volume.Value;
+                audioSource.volume = MaleBreath.VolumeVoice.Value;
                 voiceTransform = audioSource.transform;
                 if (chara != null)
                 {
@@ -322,11 +378,11 @@ namespace KK_MaleBreath
         {
             return (int)BreathComponent.hFlag.mode switch
             {
-                0 => HMode.Aibu,
+                0 => HMode.Caress,
                 //HFlag.EMode.houshi or HFlag.EMode.houshi3P or HFlag.EMode.houshi3PMMF => HMode.Houshi,
                 //HFlag.EMode.sonyu or HFlag.EMode.sonyu3P or HFlag.EMode.sonyu3PMMF => HMode.Sonyu,
-                1 or 6 or 8 => HMode.Houshi,
-                2 or 7 or 9 => HMode.Sonyu,
+                1 or 6 or 8 => HMode.Service,
+                2 or 7 or 9 => HMode.Intercourse,
                 _ => HMode.None,
             };
         }
@@ -337,8 +393,10 @@ namespace KK_MaleBreath
         {
             var voiceTypeEnum = Enum.GetNames(typeof(VoiceType));
             var hModeEnum = Enum.GetNames(typeof(HMode));
-            var files = Directory.GetFiles(System.IO.Path.GetDirectoryName(typeof(MaleBreath).Assembly.Location), "*.txt");
-            //MaleBreath.Logger.LogDebug($"Files:Found:{files.Length}");
+            var files = Directory.GetFiles(System.IO.Path.GetDirectoryName(typeof(MaleBreath).Assembly.Location), "*.csv");
+#if DEBUG
+            MaleBreath.Logger.LogDebug($"Files:Found:{files.Length}");
+#endif
             foreach (var file in files)
             {
                 ReadFile(file, voiceTypeEnum, hModeEnum);
@@ -347,97 +405,116 @@ namespace KK_MaleBreath
         private static void ReadFile(string file, string[] voiceTypeEnum, string[] hModeEnum)
         {
             var numbersInName = Regex.Match(file, @"\d+").Value;
-            if (numbersInName.Count() == 0 ) return;
+            if (numbersInName.Length == 0) return;
 
             var personalityId = Int32.Parse(numbersInName);
             if (personalityId < 0 || personalityId > 38) return;
+#if DEBUG
             MaleBreath.Logger.LogDebug($"ReadFile:{personalityId}");
-            // We separate everything by lines
+#endif
+            // Separate everything by lines
             var array = System.IO.File.ReadAllText(file)
-                .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
             if (array.Length == 0) return;
 
             // Populate dic
             if (!voiceDic.ContainsKey(personalityId))
             {
-                voiceDic.Add(personalityId, new List<List<List<VoiceEntry>>>());
+                voiceDic.Add(personalityId, []);
                 var dic = voiceDic[personalityId];
                 for (var j = 0; j < hModeEnum.Length; j++)
                 {
-                    dic.Add(new List<List<VoiceEntry>>());
+                    dic.Add([]);
                     for (var i = 0; i < voiceTypeEnum.Length; i++)
                     {
-                        dic[j].Add(new List<VoiceEntry>());
+                        dic[j].Add([]);
                     }
                 }
             }
-            // We parse each line separately. Wait for the line with the exact name from enum,
-            // and start to dump consequent lines in appropriate category until we meet the next line with enum name.
-            var currentHMode = -1;
-            var currentVoiceType = -1;
+            // Parse each line separately.
             var personalitySubstring = personalityId + "_";
             foreach (var item in array)
             {
+#if DEBUG
+                MaleBreath.Logger.LogDebug($"Parse line:{item}");
+#endif
                 var trim = item.Replace(" ", string.Empty);
                 trim = trim.Replace("\t", string.Empty);
-
                 if (trim.StartsWith("//", StringComparison.Ordinal)) continue;
-                if (hModeEnum.Any(s => s.Equals(trim)))
-                {
-                    currentHMode = Array.IndexOf(hModeEnum, trim);
-                    MaleBreath.Logger.LogDebug($"Dic:Mode:{(HMode)currentHMode}:{trim}");
-                }
-                else if (voiceTypeEnum.Any(s => s.Equals(trim)))
-                {
-                    currentVoiceType = Array.IndexOf(voiceTypeEnum, trim);
-                    MaleBreath.Logger.LogDebug($"Dic:Category:{(VoiceType)currentVoiceType}:{trim}");
-                }
-                else
-                {
-                    //MaleBreath.Logger.LogDebug($"Dic:Add:{(HMode)currentHMode}:{(VoiceType)currentVoiceType}");
-                    if (currentHMode == -1 || currentVoiceType == -1) continue;
 
-                    var split = trim.Split(',');
-                    if (split.Length < 2)
-                    {
-                        MaleBreath.Logger.LogWarning($"Invalid line in .txt file of {personalityId} personality:\n" +
-                            $"{item}");
-                        continue;
-                    }
-                    if (AddVoiceEntry(split, personalitySubstring, out var voiceEntry))
-                    {
-                        voiceDic[personalityId][currentHMode][currentVoiceType].Add(voiceEntry);
-                    }
+                var split = trim.Split(',');
+
+                if (split.Length < 4) continue;
+
+                if (!hModeEnum.Any(s => s.Equals(split[0]))) continue;
+
+                if (!voiceTypeEnum.Any(s => s.Equals(split[1]))) continue;
+                
+                if (split[2].IsNullOrWhiteSpace() || split[3].IsNullOrWhiteSpace()) continue;
+
+                var currentHMode = Array.IndexOf(hModeEnum, split[0]);
+
+                var currentVoiceType = Array.IndexOf(voiceTypeEnum, split[1]);
+
+
+                if (AddVoiceEntry(split, personalitySubstring, out var voiceEntry))
+                {
+#if DEBUG
+                    MaleBreath.Logger.LogDebug($"AddEntry:{personalityId},{currentHMode},{currentVoiceType}");
+#endif
+                    voiceDic[personalityId][currentHMode][currentVoiceType].Add(voiceEntry);
                 }
+
+                //if (hModeEnum.Any(s => s.Equals(trim)))
+                //{
+                //    MaleBreath.Logger.LogDebug($"Dic:Mode:{(HMode)currentHMode}:{trim}");
+                //}
+                //else if (voiceTypeEnum.Any(s => s.Equals(trim)))
+                //{
+                //    MaleBreath.Logger.LogDebug($"Dic:Category:{(VoiceType)currentVoiceType}:{trim}");
+                //}
+                //else
+                //{
+                //    //MaleBreath.Logger.LogDebug($"Dic:Add:{(HMode)currentHMode}:{(VoiceType)currentVoiceType}");
+                //    if (currentHMode == -1 || currentVoiceType == -1) continue;
+
+                    //    var split = trim.Split(',');
+                    //    if (split.Length < 2)
+                    //    {
+                    //        MaleBreath.Logger.LogWarning($"Invalid line in .txt file of {personalityId} personality:\n" +
+                    //            $"{item}");
+                    //        continue;
+                    //    }
+
+                    //}
             }
         }
         private static bool AddVoiceEntry(string[] strings, string personalitySubstring, out VoiceEntry voiceEntry)
         {
-            var personalitySubstringCount = personalitySubstring.Count();
-            for (var i = 0; i < 2; i++)
-            {
-                if (strings[i].Length == 0 || IsComment(strings[i]))
-                {
-                    voiceEntry = new VoiceEntry();
-                    return false;
-                }
-            }
+            var personalitySubstringCount = personalitySubstring.Length;
+            //for (var i = 0; i < 2; i++)
+            //{
+            //    if (strings[i].Length == 0 || IsComment(strings[i]))
+            //    {
+            //        voiceEntry = new VoiceEntry();
+            //        return false;
+            //    }
+            //}
+
             var hExp = -1;
-            if (strings.Length > 2 && strings[2].Length > 0 && !IsComment(strings[2])
-                && int.TryParse(strings[2], out var result) && result >= -1 && result < 4)
-            {
-                hExp = result;
-            }
-            else if (strings[0].EndsWith("_00.unity3d", StringComparison.Ordinal) && strings[0].Contains("/h/")
-                && int.TryParse(strings[1].Substring(strings[1].LastIndexOf(personalitySubstring) + personalitySubstringCount, 2), out var number)
+
+            if (strings[2].Contains("/h/")
+                && int.TryParse(strings[3].Substring(strings[3].LastIndexOf(personalitySubstring) + personalitySubstringCount, 2), out var number)
                 && number >= 0 && number < 4)
             {
-                // No explicit exp stated.
-                // We look for personality index in format of "27_" and grab next two numbers, in h they are always h experience.
+                // We look for personality index in format "27_" and grab next two numbers, in h they are always h experience.
                 hExp = number;
             }
-            voiceEntry = new VoiceEntry(strings[0], strings[1], hExp);
-            MaleBreath.Logger.LogDebug($"{voiceEntry.bundle}:{voiceEntry.asset}:{voiceEntry.hExp}");
+            voiceEntry = new VoiceEntry(strings[2], strings[3], hExp);
+#if DEBUG
+            MaleBreath.Logger.LogDebug($"String:{strings[0]},{strings[1]},{strings[2]},{strings[3]}");
+            MaleBreath.Logger.LogDebug($"AddVoiceEntry:{voiceEntry.bundle}:{voiceEntry.asset}:{voiceEntry.hExp}");
+#endif
             return true;
         }
         private static bool IsComment(string str) => str.StartsWith("//", StringComparison.Ordinal);
@@ -475,10 +552,10 @@ namespace KK_MaleBreath
                 BreathType.KissSlow => breathKissSlow,
                 BreathType.KissFast => breathKissFast,
 
-                BreathType.KissDuringLoopWeakSlow => breathKissDuringLoopWeakSlow,
-                BreathType.KissDuringLoopWeakFast => breathKissDuringLoopWeakFast,
-                BreathType.KissDuringLoopStrongSlow => breathKissDuringLoopStrongSlow,
-                BreathType.KissDuringLoopStrongFast => breathKissDuringLoopStrongFast,
+                BreathType.KissLoopWeakSlow => breathKissDuringLoopWeakSlow,
+                BreathType.KissLoopWeakFast => breathKissDuringLoopWeakFast,
+                BreathType.KissLoopStrongSlow => breathKissDuringLoopStrongSlow,
+                BreathType.KissLoopStrongFast => breathKissDuringLoopStrongFast,
 
                 BreathType.LickSlow => breathLickWeakSlow,
                 BreathType.LickFast => breathLickWeakFast,

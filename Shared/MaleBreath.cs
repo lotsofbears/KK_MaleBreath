@@ -24,18 +24,22 @@ namespace KK_MaleBreath
     {
         public const string GUID = "kk.malebreath";
         public const string Name = "KK_MaleBreath";
-
         // There is a rare nullref "crash", preventing this to be 1.0
         // Haven't seen it in a while though, no clue how to catch it.
         public const string Version = "0.9.0";
+
+
         // public new static PluginInfo Info;
         public static ConfigEntry<EnableState> Enable;
         public static ConfigEntry<Personality> PlayerPersonality;
         public static ConfigEntry<HExp> PreferredVoiceExperience;
         public static ConfigEntry<HExp> PreferredBreathExperience;
-        public static ConfigEntry<float> Volume;
+        public static ConfigEntry<float> VolumeBreath;
+        public static ConfigEntry<float> VolumeVoice;
         public static ConfigEntry<int> AverageVoiceCooldown;
         public static ConfigEntry<bool> RunInAibu;
+
+
         internal new static ManualLogSource Logger;
 
         // Hook for KK(S)_VR to get desirable personality (It can play male voices on controller touch). 
@@ -61,8 +65,8 @@ namespace KK_MaleBreath
             RunInAibu = Config.Bind(
                 section: "",
                 key: "Run in caress",
-                defaultValue: true,
-                new ConfigDescription("",
+                defaultValue: false,
+                new ConfigDescription("Add breath to the camera",
                 null,
                 new ConfigurationManagerAttributes { Order = 19 })
                 );
@@ -82,7 +86,7 @@ namespace KK_MaleBreath
                 section: "",
                 key: "BreathExperience",
                 defaultValue: HExp.淫乱,
-                new ConfigDescription("",
+                new ConfigDescription("Prefer if available, fallback at lower one if not",
                 null,
                 new ConfigurationManagerAttributes { Order = 14 })
                 );
@@ -92,16 +96,26 @@ namespace KK_MaleBreath
                 section: "",
                 key: "VoiceExperience",
                 defaultValue: HExp.淫乱,
-                new ConfigDescription("",
+                new ConfigDescription("Prefer if available, fallback at lower one if not\nRequires manually set-up voices in .csv file",
                 null,
                 new ConfigurationManagerAttributes { Order = 13 })
                 );
 
 
-            Volume = Config.Bind(
+            VolumeBreath = Config.Bind(
                 section: "",
-                key: "Volume",
+                key: "Volume breath",
                 defaultValue: 0.2f,
+                new ConfigDescription("",
+                new AcceptableValueRange<float>(0f, 1f),
+                new ConfigurationManagerAttributes { Order = 10, ShowRangeAsPercent = false })
+                );
+
+
+            VolumeVoice = Config.Bind(
+                section: "",
+                key: "Volume voice",
+                defaultValue: 0.7f,
                 new ConfigDescription("",
                 new AcceptableValueRange<float>(0f, 1f),
                 new ConfigurationManagerAttributes { Order = 10, ShowRangeAsPercent = false })
@@ -112,7 +126,7 @@ namespace KK_MaleBreath
                 section: "",
                 key: "VoiceCooldown",
                 defaultValue: 25,
-                new ConfigDescription("",
+                new ConfigDescription("Requires manually set-up voices in .csv file",
                 new AcceptableValueRange<int>(0, 60),
                 new ConfigurationManagerAttributes { Order = 9 })
                 );
@@ -123,7 +137,7 @@ namespace KK_MaleBreath
         }
         public enum EnableState
         {
-            Disabled,
+            Disable,
             OnlyInVr,
             Always,
         }

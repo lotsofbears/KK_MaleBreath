@@ -1,15 +1,16 @@
-﻿using System.Reflection;
+﻿using KK_MaleBreath;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("KK_MaleBreath")]
+[assembly: AssemblyTitle(MaleBreath.Name)]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("https://github.com/lotsofbears/KK_MaleBreath")]
-[assembly: AssemblyProduct("KK_MaleBreath")]
+[assembly: AssemblyProduct(MaleBreath.Name)]
 [assembly: AssemblyCopyright("Copyright ©  2024")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -29,5 +30,4 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("1.0.0")]
-[assembly: AssemblyFileVersion("1.0.0")]
+[assembly: AssemblyVersion(MaleBreath.Version)]

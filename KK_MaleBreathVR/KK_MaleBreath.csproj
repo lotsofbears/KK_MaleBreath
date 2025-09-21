@@ -73,10 +73,6 @@
       <HintPath>..\packages\IllusionLibs.Koikatu.UnityEngine.UI.5.6.2.4\lib\net35\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="VRGIN">
-      <HintPath>..\..\KK_SensibleH\Libs\VRGIN.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

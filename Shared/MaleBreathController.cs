@@ -1,14 +1,8 @@
-﻿using ADV.Commands.Base;
-using HarmonyLib;
+﻿using HarmonyLib;
 using KKAPI.MainGame;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using UnityEngine;
-using VRGIN.Core;
-using VRGIN.Helpers;
 
 namespace KK_MaleBreath
 {
@@ -62,7 +56,6 @@ namespace KK_MaleBreath
             {
                 ClickButton = AccessTools.MethodDelegate<Action<string>>(AccessTools.FirstMethod(type, m => m.Name.Equals("ClickButton")));
             }
-            _vr = SteamVRDetector.IsRunning;
             MaleBreath.Enable.SettingChanged += (sender, e) => SettingChanged_Enable();
             SettingChanged_Enable();
         }
@@ -99,6 +92,17 @@ namespace KK_MaleBreath
 
         protected override void OnStartH(MonoBehaviour proc, HFlag hFlag, bool vr)
         {
+            if (!_vr)
+            {
+                // On 'Start' VR isn't up yet to look up it's instance.
+                var vrType = AccessTools.TypeByName("KK_VR.Interpreters.KoikGameInterp");
+                if (vrType != null)
+                {
+                    //var behavior = (MonoBehaviour)GetComponent(vrType);
+                    _vr = FindObjectOfType(vrType) != null;
+                }
+            }
+            
             var traverse = Traverse.Create(proc);
             BreathComponent.hFlag = hFlag;
             BreathComponent.male = traverse.Field("male").GetValue<ChaControl>();
@@ -114,34 +118,48 @@ namespace KK_MaleBreath
         internal static void UpdateComponents(bool destroy = true)
         {
             // We update components on each new animController to reset voices/states and track visibility of the character.
-            AddComponent(BreathComponent.male, destroy);
+            if (destroy)
+            {
+                var charas = new List<ChaControl>();
+
+                foreach (var instance in BreathComponent.instances)
+                {
+                    charas.Add(instance.GetComponent<ChaControl>());
+                }
+
+                foreach (var chara in charas)
+                {
+                    if (chara == null) continue;
+
+                    AddComponent(chara);
+                }
+            }
+            else
+            {
+                BreathComponent.OnChangeAnimator();
+            }
+                
 #if DEBUG
             MaleBreath.Logger.LogInfo($"UpdateComponents");
 #endif
         }
 
-        private static void AddComponent(ChaControl chara, bool destroy = true)
+
+        private static void AddComponent(ChaControl chara)
         {
-            if (chara != null)
+            if (chara == null) return;
+
+            var component = chara.GetComponent<BreathComponent>();
+            if (component != null)
             {
-                var component = chara.GetComponent<BreathComponent>();
-                if (component != null)
-                {
-                    if (destroy)
-                    {
-                        Destroy(component);
-                    }
-                    else
-                    {
-                        component.UpdateMouthTransform();
-                        return;
-                    }    
-                }
-                if (BreathComponent.hFlag != null || IsModeAvailable(BreathComponent.hFlag.mode))
-                {
-                    chara.gameObject.AddComponent<BreathComponent>();
-                }
+                Destroy(component);
             }
+
+            if (BreathComponent.hFlag != null && IsModeAvailable(BreathComponent.hFlag.mode))
+            {
+                chara.gameObject.AddComponent<BreathComponent>();
+            }
+
         }
 
         internal static bool IsModeAvailable(HFlag.EMode mode)
@@ -171,7 +189,7 @@ namespace KK_MaleBreath
             if (IsEnabled)
             {
 #if DEBUG
-                MaleBreath.Logger.LogDebug($"ButtonClick:{button}:{_queuedClick}");
+                MaleBreath.Logger.LogInfo($"ButtonClick:{(ClickType)button}:{_queuedClick}");
 #endif
                 if (_queuedClick != ClickType.None)
                 {
@@ -180,8 +198,10 @@ namespace KK_MaleBreath
                 else
                 {
                     var click = (ClickType)button;
-                    if (!click.ToString().Contains("_novoice") && BreathComponent.instances[0].SetTriggerVoice(GetVoiceType(click)))
+                    var voiceType = GetVoiceType(click);
+                    if (voiceType != LoadGameVoice.VoiceType.Idle && BreathComponent.instances.Count > 0 && BreathComponent.instances[0].SetTriggerVoice(voiceType))
                     {
+                        CorrectClick(ref click);
                         _queuedClick = click;
                         return true;
                     }
@@ -189,15 +209,19 @@ namespace KK_MaleBreath
             }
             return false;
         }
-
+ 
+        private static void CorrectClick(ref ClickType clickType)
+        {
+            if (clickType == ClickType.Inside) clickType = ClickType.None;
+        }
         private static LoadGameVoice.VoiceType GetVoiceType(ClickType clickType)
         {
             return clickType switch
             {
+                ClickType.Insert_novoice or ClickType.InsertAnal_novoice => LoadGameVoice.VoiceType.Exclamation,
                 ClickType.Insert => LoadGameVoice.VoiceType.Insert,
                 ClickType.InsertAnal => LoadGameVoice.VoiceType.InsertAnal,
                 ClickType.Inside => LoadGameVoice.VoiceType.BeforeClimaxSelf,
-                ClickType.Outside => LoadGameVoice.VoiceType.BeforeClimaxSelf,
                 _ => LoadGameVoice.VoiceType.Idle
             };
         }
@@ -207,7 +231,7 @@ namespace KK_MaleBreath
 #if DEBUG
             MaleBreath.Logger.LogDebug($"AttemptToClick:{_queuedClick}");
 #endif
-            if (_queuedClick != ClickType.None && ClickButton != null)
+            if (ClickButton != null)
             {
                 ClickButton(_queuedClick.ToString());
             }

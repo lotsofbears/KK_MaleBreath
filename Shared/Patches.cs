@@ -26,6 +26,14 @@ namespace KK_MaleBreath
         {
             MaleBreathController.UpdateComponents();
         }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(HActionBase), nameof(HActionBase.SetPlay))]
+        public static void HActionBasePostfix(string _nextAnimation)
+        {
+            BreathComponent.OnSetPlay(_nextAnimation);
+        }
+
 #if KK
         [HarmonyPostfix]
         [HarmonyPatch(typeof(LoadVoice), nameof(LoadVoice.Start), MethodType.Enumerator)]
