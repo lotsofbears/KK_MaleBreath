@@ -121,8 +121,17 @@ namespace KK_MaleBreath
 
 
         }
-        private static string GetBundleName(int id, bool h)
+        private static string GetBundle(int id, bool hVoice)
         {
+            return GetBundleName(id, hVoice) +
+#if KK
+                (hVoice ? "_00.unity3d" : ".unity3d");
+#else
+                ".unity3d";
+#endif
+
+            static string GetBundleName(int id, bool h)
+            {
 #if KK
             return id switch
             {
@@ -135,21 +144,13 @@ namespace KK_MaleBreath
                 _ => "00"
             };
 #else
-            return id switch
-            {
-                40 or 41 or 42 or 43 => h ? "71" : "70",
-                _ => h ? "01" : "00"
-            };
+                return id switch
+                {
+                    40 or 41 or 42 or 43 => h ? "71" : "70",
+                    _ => h ? "01" : "00"
+                };
 #endif
-        }
-        private static string GetBundle(int id, bool hVoice)
-        {
-            return GetBundleName(id, hVoice) +
-#if KK
-                (hVoice ? "_00.unity3d" : ".unity3d");
-#else
-                ".unity3d";
-#endif
+            }
         }
         public static Transform PlayBreath(BreathType breathType, ChaControl chara = null, Transform breathTransform = null)//, bool setCooldown)
         {
@@ -392,6 +393,8 @@ namespace KK_MaleBreath
 
         public static void Initialize()
         {
+            voiceDic.Clear();
+
             var voiceTypeEnum = Enum.GetNames(typeof(VoiceType));
 
             var hModeEnum = Enum.GetNames(typeof(HMode));
@@ -411,7 +414,13 @@ namespace KK_MaleBreath
             if (numbersInName.Length == 0) return;
 
             var personalityId = Int32.Parse(numbersInName);
-            if (personalityId < 0 || personalityId > 38) return;
+            if (personalityId < 0
+#if KK
+                || personalityId > 38) 
+#else
+                || personalityId > 43)
+#endif
+                return;
 #if DEBUG
             MaleBreath.Logger.LogDebug($"ReadFile:{personalityId}");
 #endif
@@ -453,7 +462,26 @@ namespace KK_MaleBreath
                 if (!hModeEnum.Any(s => s.Equals(split[0]))) continue;
 
                 if (!voiceTypeEnum.Any(s => s.Equals(split[1]))) continue;
-                
+#if KKS
+                if (MaleBreath.FixWrongBundles.Value)
+                {
+                    // Fix bundle
+                    // "sound/data/pcm/c27/h/00_00.unity3d" => ~"sound/data/pcm/c27/h/01.unity3d"
+                    var bundleString = split[2];
+
+                    var lastBundleSlashIndex = bundleString.LastIndexOf("/");
+                    if (lastBundleSlashIndex == -1 || lastBundleSlashIndex >= bundleString.Length - 1) continue;
+
+                    // "sound/data/pcm/c27/h/"
+                    var bundlePath = bundleString.Substring(0, lastBundleSlashIndex + 1);
+                    // "00_00.unity3d"
+                    var bundleName = bundleString.Substring(lastBundleSlashIndex + 1);
+                    var isH = bundlePath.Contains("/h/");
+
+                    split[2] = bundlePath + GetBundle(personalityId, isH);
+                }
+#endif
+
                 if (split[2].IsNullOrWhiteSpace() || split[3].IsNullOrWhiteSpace()) continue;
 
                 var currentHMode = Array.IndexOf(hModeEnum, split[0]);

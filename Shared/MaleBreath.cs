@@ -26,7 +26,7 @@ namespace KK_MaleBreath
         public const string Name = "KK_MaleBreath";
         // There is a rare nullref "crash", preventing this to be 1.0
         // Haven't seen it in a while though, no clue how to catch it.
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
 
 
         // public new static PluginInfo Info;
@@ -38,8 +38,10 @@ namespace KK_MaleBreath
         public static ConfigEntry<float> VolumeVoice;
         public static ConfigEntry<int> AverageVoiceCooldown;
         public static ConfigEntry<bool> RunInAibu;
-
-
+#if KKS
+        // Allow use of KK bundles in KKS
+        public static ConfigEntry<bool> FixWrongBundles;
+#endif
         internal new static ManualLogSource Logger;
 
         // Hook for KK(S)_VR to get desirable personality (It can play male voices on controller touch). 
@@ -133,10 +135,28 @@ namespace KK_MaleBreath
                 );
 
 
+#if KKS
+            FixWrongBundles = Config.Bind(
+                section: "",
+                key: "FixBundleNames",
+                defaultValue: true,
+                new ConfigDescription("Allow to load bundles in KKS with KK names and vice versa",
+                null,
+                new ConfigurationManagerAttributes { Order = -100 })
+                );
+
+
+            FixWrongBundles.SettingChanged += (s, e) => LoadGameVoice.Initialize();
+
+#endif
+
             LoadGameVoice.Initialize();
 
             GameAPI.RegisterExtraBehaviour<MaleBreathController>(GUID);
+
         }
+
+
         public enum EnableState
         {
             Disable,
