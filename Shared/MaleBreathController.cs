@@ -83,7 +83,7 @@ namespace KK_MaleBreath
                     {
                         foreach (var instance in BreathComponent.instances)
                         {
-                            Component.Destroy(instance);
+                            Destroy(instance);
                         }
                     }
                 }
@@ -94,7 +94,7 @@ namespace KK_MaleBreath
         {
             if (!_vr)
             {
-                // On 'Start' VR isn't up yet to look up it's instance.
+                // On 'Start()' VR isn't up yet to look up it's instance.
                 var vrType = AccessTools.TypeByName("KK_VR.Interpreters.KoikGameInterp");
                 if (vrType != null)
                 {

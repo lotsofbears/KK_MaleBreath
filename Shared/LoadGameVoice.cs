@@ -190,8 +190,9 @@ namespace KK_MaleBreath
 
             var h = bundle.EndsWith("h/", StringComparison.OrdinalIgnoreCase);
             bundle += GetBundle(personalityId, hVoice: h);
+#if DEBUG
             MaleBreath.Logger.LogDebug($"LoadBreath:{bundle}:{asset}");
-
+#endif
             var setting = new Illusion.Game.Utils.Voice.Setting
             {
                 no = personalityId,
@@ -216,7 +217,7 @@ namespace KK_MaleBreath
             var audioSource = Illusion.Game.Utils.Voice.OncePlayChara(setting);
             if (audioSource == null)
             {
-                MaleBreath.Logger.LogWarning($"Couldn't find specified breath:{bundle}:{asset}");
+                MaleBreath.Logger.LogInfo($"Couldn't find specified breath:{bundle}:{asset}");
             }
             else
             {
@@ -351,7 +352,7 @@ namespace KK_MaleBreath
             var audioSource = Illusion.Game.Utils.Voice.OncePlayChara(setting);
             if (audioSource == null)
             {
-                MaleBreath.Logger.LogWarning($"Couldn't find specified voice:{voiceEntry.bundle}:{voiceEntry.asset}");
+                MaleBreath.Logger.LogInfo($"Couldn't find specified voice:{voiceEntry.bundle}:{voiceEntry.asset}");
             }
             else
             {
@@ -392,7 +393,9 @@ namespace KK_MaleBreath
         public static void Initialize()
         {
             var voiceTypeEnum = Enum.GetNames(typeof(VoiceType));
+
             var hModeEnum = Enum.GetNames(typeof(HMode));
+
             var files = Directory.GetFiles(System.IO.Path.GetDirectoryName(typeof(MaleBreath).Assembly.Location), "*.csv");
 #if DEBUG
             MaleBreath.Logger.LogDebug($"Files:Found:{files.Length}");
@@ -433,6 +436,7 @@ namespace KK_MaleBreath
             }
             // Parse each line separately.
             var personalitySubstring = personalityId + "_";
+
             foreach (var item in array)
             {
 #if DEBUG
